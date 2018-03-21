@@ -1,8 +1,8 @@
-from arbitrage.public_markets._bitstamp import Bitstamp
+from public_markets._bitstamp import Bitstamp
+# from public_markets._bitstamp import Bitstamp
 
 class BitstampEUR(Bitstamp):
     def __init__(self):
-        print("HOLY SHIT I'M IN BITSTAMPEUR.PY")
         super().__init__("EUR", "btceur")
 
 if __name__ == "__main__":

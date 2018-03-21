@@ -1,4 +1,4 @@
-from arbitrage.public_markets._bitflyer import BitFlyer
+from public_markets._bitflyer import BitFlyer
 
 class BitFlyerEUR(BitFlyer):
     def __init__(self):

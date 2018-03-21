@@ -1,4 +1,4 @@
-from arbitrage.public_markets._cex import CEX
+from public_markets._cex import CEX
 
 class CEXUSD(CEX):
     def __init__(self):

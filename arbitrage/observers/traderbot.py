@@ -1,9 +1,9 @@
 import logging
 import config
 import time
-from arbitrage.observers.observer import Observer
-from arbitrage.observers.emailer import send_email
-from arbitrage.fiatconverter import FiatConverter
+from observers.observer import Observer
+from observers.emailer import send_email
+from fiatconverter import FiatConverter
 
 
 class TraderBot(Observer):

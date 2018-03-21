@@ -34,9 +34,9 @@ class Arbitrer(object):
                 exec('import json', globals())
                 print("json test:", json.dumps(market_name))
 
-                to_execute = 'import arbitrage.public_markets.'+market_name.lower()
+                to_execute = 'import public_markets.'+market_name.lower()
                 print("to_execute:", to_execute)
-                # exec(to_execute, globals())
+                exec(to_execute, globals())
 
                 print("arbitrer.py, init_markets, MADE PAST to-execute")
 
@@ -44,7 +44,7 @@ class Arbitrer(object):
                 # exec('import public_markets.' + market_name.lower())
 
                 print("arbitrer.py, init_markets, MADE IT PAST EXEC")
-                # market = eval('public_markets.' + market_name.lower() + '.' + market_name + '()')
+                market = eval('public_markets.' + market_name.lower() + '.' + market_name + '()')
 
 
                 # ORIGINAL CODE FROM GITHUB:

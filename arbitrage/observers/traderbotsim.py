@@ -1,6 +1,6 @@
 import logging
 import json
-from arbitrage.observers.traderbot import TraderBot
+from observers.traderbot import TraderBot
 
 
 class MockMarket(object):

@@ -13,7 +13,7 @@ import hashlib
 import sys
 import json
 from arbitrage import config
-from arbitrage.private_markets.market import Market, TradeException
+from private_markets.market import Market, TradeException
 
 
 class PrivateBitstampUSD(Market):

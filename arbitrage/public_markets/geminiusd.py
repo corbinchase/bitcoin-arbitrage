@@ -1,4 +1,4 @@
-from arbitrage.public_markets._gemini import Gemini
+from public_markets._gemini import Gemini
 
 class GeminiUSD(Gemini):
     def __init__(self):

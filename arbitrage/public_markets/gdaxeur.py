@@ -1,4 +1,4 @@
-from arbitrage.public_markets._gdax import GDAX
+from public_markets._gdax import GDAX
 
 class GDAXEUR(GDAX):
     def __init__(self):
