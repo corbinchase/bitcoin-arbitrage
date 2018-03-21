@@ -2,17 +2,23 @@
 
 import logging
 import argparse
-import sys
 import glob
 import os
 import inspect
-from arbitrage.arbitrer import Arbitrer
-from arbitrage import public_markets
+import os.path
+import sys
+
+import arbitrer
+import public_markets
+
+
+# import public_markets
 
 
 class ArbitrerCLI:
     def __init__(self):
         self.inject_verbose_info()
+        print("arbitrage.py, __init__")
 
     def inject_verbose_info(self):
         logging.VERBOSE = 15
@@ -60,11 +66,16 @@ class ArbitrerCLI:
         for market in pmarketsi:
             print(market)
 
+    # create arbitrer bot with args from execute command, from CLI
     def create_arbitrer(self, args):
-        self.arbitrer = Arbitrer()
+        print("arbitrage.py, create_arbitrer")
+        # self.arbitrer = Arbitrer()
+        self.arbitrer = arbitrer.Arbitrer()
+        print("arbitrage.py, create_arbitrer && Arbitrer() has been created")
         if args.observers:
             self.arbitrer.init_observers(args.observers.split(","))
         if args.markets:
+            print("create_arbiter & args.markets = true")
             self.arbitrer.init_markets(args.markets.split(","))
 
     def init_logger(self, args):
@@ -92,9 +103,11 @@ class ArbitrerCLI:
         self.init_logger(args)
         self.exec_command(args)
 
+
 def main():
     cli = ArbitrerCLI()
     cli.main()
+
 
 if __name__ == "__main__":
     main()

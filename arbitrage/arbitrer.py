@@ -2,33 +2,57 @@
 
 import time
 import logging
-import json
+# import json
 from concurrent.futures import ThreadPoolExecutor, wait
-from arbitrage import public_markets
-from arbitrage import observers
-from arbitrage import config
+import observers
+# import public_markets
+import config
+from public_markets import bitstampeur
 
 
 class Arbitrer(object):
     def __init__(self):
+        print("bitstamp market:", bitstampeur)
         self.markets = []
         self.observers = []
         self.depths = {}
+        print("arbitrer.py, Arbitrer, __init__, len(config.markets):", len(config.markets))
         self.init_markets(config.markets)
-        self.init_observers(config.observers)
+        # self.init_observers(config.observers)
         self.max_tx_volume = config.max_tx_volume
         self.threadpool = ThreadPoolExecutor(max_workers=10)
 
+
     def init_markets(self, markets):
         self.market_names = markets
+        print("in init_markets, markets", markets)
         for market_name in markets:
             try:
-                exec('import arbitrage.public_markets.' + market_name.lower())
-                market = eval('arbitrage.public_markets.' + market_name.lower() + '.' +
-                              market_name + '()')
+                print("\n public_markets." + market_name.lower())
+
+                # TODO: this is the error line
+                exec('import json', globals())
+                print("json test:", json.dumps(market_name))
+
+                to_execute = 'import arbitrage.public_markets.'+market_name.lower()
+                print("to_execute:", to_execute)
+                # exec(to_execute, globals())
+
+                print("arbitrer.py, init_markets, MADE PAST to-execute")
+
+                # exec('import public_markets.' + market_name.lower(), globals())
+                # exec('import public_markets.' + market_name.lower())
+
+                print("arbitrer.py, init_markets, MADE IT PAST EXEC")
+                # market = eval('public_markets.' + market_name.lower() + '.' + market_name + '()')
+
+
+                # ORIGINAL CODE FROM GITHUB:
+                # exec('import arbitrage.public_markets.' + market_name.lower())
+                # market = eval('arbitrage.public_markets.' + market_name.lower() + '.' + market_name + '()')
                 self.markets.append(market)
             except (ImportError, AttributeError) as e:
-                print("%s market name is invalid: Ignored (you should check your config file)" % (market_name))
+                print("Market name {} is invalid: Ignored (you should check your config file). {}".format(market_name, e))
 
     def init_observers(self, _observers):
         self.observer_names = _observers
@@ -39,7 +63,7 @@ class Arbitrer(object):
                                 observer_name + '()')
                 self.observers.append(observer)
             except (ImportError, AttributeError) as e:
-                print("%s observer name is invalid: Ignored (you should check your config file)" % (observer_name))
+                print("%s observer name is invalid: Ignored (you should check your config file)" % observer_name)
 
     def get_profit_for(self, mi, mj, kask, kbid):
         if self.depths[kask]["asks"][mi]["price"] \
