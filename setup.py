@@ -17,5 +17,5 @@ setup(name='bitcoin-arbitrage',
       url='https://github.com/maxme/bitcoin-arbitrage',
       arbitrage=['bin/bitcoin-arbitrage'],
       test_suite='nose.collector',
-      tests_require=['nose'],
-  )
+      tests_require=['nose'], install_requires=['ccxt']
+      )

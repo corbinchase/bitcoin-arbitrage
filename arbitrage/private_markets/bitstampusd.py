@@ -12,7 +12,8 @@ import urllib.parse
 import hashlib
 import sys
 import json
-from arbitrage import config
+import config
+import pprint
 from private_markets.market import Market, TradeException
 
 
@@ -44,6 +45,8 @@ class PrivateBitstampUSD(Market):
         req = urllib.request.Request(url, postdata, headers=headers)
         response = urllib.request.urlopen(req)
         code = response.getcode()
+        print("9.0 private_markets, bitstampusd.py, __send_request, self.username: ", self.username, "\n postdata: ", postdata, "\n req: ", req,
+              "\n response: ", response, "\n code: ", code)
         if code == 200:
             jsonstr = response.read().decode('utf-8')
             return json.loads(jsonstr)
@@ -66,6 +69,8 @@ class PrivateBitstampUSD(Market):
     def get_info(self):
         """Get balance"""
         response = self._send_request(self.balance_url)
+
         if response:
-            self.btc_balance = float(response["btc_available"])
-            self.usd_balance = float(response["usd_available"])
+            print("10.0private_markets, bitstampusd.py, get_info -- passed IF RESPONSE")
+            # self.btc_balance = float(response["btc_available"])
+            # self.usd_balance = float(response["usd_available"])

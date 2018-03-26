@@ -20,7 +20,7 @@ class PrivatePaymium(Market):
     withdraw_url = "https://paymium.com/api/v1/transfers/send_bitcoins/"
 
     def __init__(self):
-        # FIXME: update this file when bitcoin central re-opens
+        # FIXME: update this file when bitcoin central re-opens (from Maxme)
         raise Exception("Paymium is closed")
         super().__init__()
         self.username = config.paymium_username

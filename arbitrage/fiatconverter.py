@@ -22,7 +22,7 @@ class FiatConverter:
         }
         self.update_delay = 60 * 60 # every hour
         self.last_update = 0
-        self.bank_fee = 0.007 # FIXME: bank fee
+        self.bank_fee = 0.007 # FIXME: bank fee (from Maxme)
 
     def get_currency_pair(self, code_from, code_to):
         url = self.rate_exchange_url % (code_from, code_to)

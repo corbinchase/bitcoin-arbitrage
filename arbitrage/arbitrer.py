@@ -1,5 +1,6 @@
 # Copyright (C) 2013, Maxime Biais <maxime@biais.org>
-
+import ccxt
+import asyncio
 import time
 import logging
 # import json
@@ -12,12 +13,10 @@ from public_markets import bitstampeur
 
 class Arbitrer(object):
     def __init__(self):
-        print("bitstamp market:", bitstampeur)
         self.markets = []
         self.observers = []
         self.depths = {}
-        print("arbitrer.py, Arbitrer, __init__, len(config.markets):", len(config.markets))
-        self.init_markets(config.markets)
+        self.init_markets(config.markets_ccxt)
         # self.init_observers(config.observers)
         self.max_tx_volume = config.max_tx_volume
         self.threadpool = ThreadPoolExecutor(max_workers=10)
@@ -25,49 +24,33 @@ class Arbitrer(object):
 
     def init_markets(self, markets):
         self.market_names = markets
-        print("in init_markets, markets", markets)
-        for market_name in markets:
-            try:
-                print("\n public_markets." + market_name.lower())
 
-                # TODO: this is the error line
-                exec('import json', globals())
-                print("json test:", json.dumps(market_name))
-
-                to_execute = 'import public_markets.'+market_name.lower()
-                print("to_execute:", to_execute)
-                exec(to_execute, globals())
-
-                print("arbitrer.py, init_markets, MADE PAST to-execute")
-
-                # exec('import public_markets.' + market_name.lower(), globals())
-                # exec('import public_markets.' + market_name.lower())
-
-                print("arbitrer.py, init_markets, MADE IT PAST EXEC")
-                market = eval('public_markets.' + market_name.lower() + '.' + market_name + '()')
-
-
-                # ORIGINAL CODE FROM GITHUB:
-                # exec('import arbitrage.public_markets.' + market_name.lower())
-                # market = eval('arbitrage.public_markets.' + market_name.lower() + '.' + market_name + '()')
-                self.markets.append(market)
-            except (ImportError, AttributeError) as e:
-                print("Market name {} is invalid: Ignored (you should check your config file). {}".format(market_name, e))
+        # TODO: Original code
+        # for market_name in markets:
+        #     try:
+        #         print("7.0 arbitrer.py, init_markets, public_markets:" + market_name.lower())
+        #         exec('import public_markets.'+market_name.lower(), globals())
+        #         market = eval('public_markets.' + market_name.lower() + '.' + market_name + '()')
+        #         self.markets.append(market)
+        #     except (ImportError, AttributeError) as e:
+        #         print("ERROR (arbitrer.py, init_markets): Market name {} is invalid: Ignored (you should check your config file). {}".format(
+        #             market_name, e))
 
     def init_observers(self, _observers):
         self.observer_names = _observers
         for observer_name in _observers:
+            print("4.0 arbitrer.py, init_observers, self.observers_names: ", self.observer_names)
             try:
-                exec('import arbitrage.observers.' + observer_name.lower())
-                observer = eval('arbitrage.observers.' + observer_name.lower() + '.' +
+                exec('import observers.' + observer_name.lower())
+                observer = eval('observers.' + observer_name.lower() + '.' +
                                 observer_name + '()')
                 self.observers.append(observer)
             except (ImportError, AttributeError) as e:
+                print("arbitrer.py, init_observers, failed observer init: ", e)
                 print("%s observer name is invalid: Ignored (you should check your config file)" % observer_name)
 
     def get_profit_for(self, mi, mj, kask, kbid):
-        if self.depths[kask]["asks"][mi]["price"] \
-           >= self.depths[kbid]["bids"][mj]["price"]:
+        if self.depths[kask]["asks"][mi]["price"] >= self.depths[kbid]["bids"][mj]["price"]:
             return 0, 0, 0, 0
 
         max_amount_buy = 0
@@ -113,18 +96,14 @@ class Arbitrer(object):
 
     def get_max_depth(self, kask, kbid):
         i = 0
-        if len(self.depths[kbid]["bids"]) != 0 and \
-           len(self.depths[kask]["asks"]) != 0:
-            while self.depths[kask]["asks"][i]["price"] \
-                  < self.depths[kbid]["bids"][0]["price"]:
+        if len(self.depths[kbid]["bids"]) != 0 and len(self.depths[kask]["asks"]) != 0:
+            while self.depths[kask]["asks"][i]["price"] < self.depths[kbid]["bids"][0]["price"]:
                 if i >= len(self.depths[kask]["asks"]) - 1:
                     break
                 i += 1
         j = 0
-        if len(self.depths[kask]["asks"]) != 0 and \
-           len(self.depths[kbid]["bids"]) != 0:
-            while self.depths[kask]["asks"][0]["price"] \
-                  < self.depths[kbid]["bids"][j]["price"]:
+        if len(self.depths[kask]["asks"]) != 0 and len(self.depths[kbid]["bids"]) != 0:
+            while self.depths[kask]["asks"][0]["price"] < self.depths[kbid]["bids"][j]["price"]:
                 if j >= len(self.depths[kbid]["bids"]) - 1:
                     break
                 j += 1

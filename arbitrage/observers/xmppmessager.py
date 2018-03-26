@@ -26,7 +26,7 @@ class MyXMPPClient(ClientXMPP):
         self.send_message(mto=config.xmpp_to, mbody=message, mtype='chat')
 
     def message(self, msg):
-        # TODO: Use this to control / re-config
+        # TODO: Use this to control / re-config (from Maxme)
         pass  # msg.reply("%(body)s" % msg).send()
 
 class XmppMessager(Observer):

@@ -19,7 +19,7 @@ def main():
     arbitrer.observers = [testobs]
     arbitrer.arbitrage_opportunity("BitstampUSD", depths["BitstampUSD"]["asks"][0],
                                    "KrakenEUR", depths["KrakenEUR"]["asks"][0])
-    # FIXME: add asserts
+    # FIXME: add asserts (from Maxme)
     elapsed = time.time() - start_time
     print("Time: %.3f" % elapsed)
 

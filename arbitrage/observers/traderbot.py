@@ -9,7 +9,7 @@ from fiatconverter import FiatConverter
 class TraderBot(Observer):
     def __init__(self):
         self.clients = {
-            # TODO: move that to the config file
+            # TODO: move that to the config file (from Maxme)
             # "BitstampUSD": bitstampusd.PrivateBitstampUSD(),
         }
         self.fc = FiatConverter()
