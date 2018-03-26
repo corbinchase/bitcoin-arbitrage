@@ -16,7 +16,7 @@ class Arbitrer(object):
         self.markets = []
         self.observers = []
         self.depths = {}
-        self.init_markets(config.markets_ccxt)
+        self.init_markets(config.markets)
         # self.init_observers(config.observers)
         self.max_tx_volume = config.max_tx_volume
         self.threadpool = ThreadPoolExecutor(max_workers=10)
