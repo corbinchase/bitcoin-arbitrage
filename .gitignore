@@ -43,3 +43,6 @@ tmp/
 
 # sensitive info
 config.py
+
+# test file
+ccxt_test_file.py

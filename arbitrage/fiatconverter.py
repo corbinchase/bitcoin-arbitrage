@@ -45,6 +45,7 @@ class FiatConverter:
 
     def update(self):
         timediff = time.time() - self.last_update
+        print("fiatconverter.py, update()")
         if timediff < self.update_delay:
             return
         self.last_update = time.time()
