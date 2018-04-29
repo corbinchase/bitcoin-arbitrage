@@ -22,5 +22,5 @@ class HistoryDumper(Observer):
     def end_opportunity_finder(self):
         pass
 
-    def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid, perc, weighted_buyprice, weighted_sellprice):
+    def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid, perc, weighted_buyprice, weighted_sellprice, pair, ask_market, bid_market):
         pass

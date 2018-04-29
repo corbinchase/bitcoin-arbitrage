@@ -11,5 +11,5 @@ class Observer(object, metaclass=abc.ABCMeta):
     ## abstract
     @abc.abstractmethod
     def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid,
-                    perc, weighted_buyprice, weighted_sellprice):
+                    perc, weighted_buyprice, weighted_sellprice, pair, ask_market, bid_market):
         pass

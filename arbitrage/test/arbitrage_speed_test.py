@@ -8,7 +8,7 @@ from observers import observer
 
 class TestObserver(observer.Observer):
     def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid,
-                    perc, weighted_buyprice, weighted_sellprice):
+                    perc, weighted_buyprice, weighted_sellprice, pair, ask_market, bid_market):
         print("Time: %.3f" % profit)
 
 def main():

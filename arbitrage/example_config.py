@@ -30,7 +30,7 @@ bitstamp_password = ""
 
 # SafeGuards
 max_tx_volume = 1  # in BTC
-min_tx_volume = 0.0001  # in BTC
+min_tx_volume = 0.0005  # in BTC
 balance_margin = 0.02  # 5%
 profit_thresh = 10  # in EUR
 perc_thresh = 8  # in %

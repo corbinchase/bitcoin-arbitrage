@@ -17,22 +17,22 @@ class ArbitrerCLI:
         self.exchanges = []
         self.inject_verbose_info()
 
+
     def inject_verbose_info(self):
         logging.VERBOSE = 15
         logging.verbose = lambda x: logging.log(logging.VERBOSE, x)
         logging.addLevelName(logging.VERBOSE, "VERBOSE")
 
     def exec_command(self, args):
-        print("2. arbitrage.py, exec_command --> args: ", args.command)
+        # print("Arg command: ", args.command)
         if "watch" in args.command:
             self.create_arbitrer(args)
             # self.list_markets()
             # print("7. Arbitrage.py, exec_command, getting balance, args: ", args)
             # TODO: get API keys and start using get_balance()
             self.get_balance(args)
-
             self.arbitrer.loop()
-            print("replay history:")
+            # print("replay history:")
             self.arbitrer.replay_history(args.replay_history)
 
         # if "replay-history" in args.command:
@@ -65,9 +65,14 @@ class ArbitrerCLI:
             sys.exit(2)
         for exchange in self.exchanges:
             if exchange.apiKey and exchange.secret:
-                print("arbitrage.py, get_balance: exchange.id: {}; number of coins available for trading:  {}".format(exchange.id, len(exchange.fetchBalance()['free'])))
+                bal_avail = exchange.fetchBalance()['free']
+                print("arbitrage.py, get_balance: exchange.id: {}; number of coins available for trading:  {}".format(exchange.id, len(bal_avail)))
+                # print("arbitrage.py, get_balance: exchange.id: {}; number of coins available for trading:  {}".format(exchange.id, bal_avail))
+
             else:
                 print("No {} API credentials can be found. Check the config.py file".format(exchange.id))
+
+
         # pmarkets = self.exchanges
         # pmarketsi = []
         # for pmarket in pmarkets:
@@ -91,25 +96,25 @@ class ArbitrerCLI:
             # market: private_markets.bitstampusd.PrivateBitstampUSD()
             # TODO: use exchange-specific API to retrieve available balance
             # market = eval('private_markets.' + pmarket.lower() + '.Private' + pmarket + '()')
-            # print("8.2 arbitrage.py, get_balance, market: ", market)
             # pmarketsi.append(market)
         # for market in pmarketsi:
-        #     print("7.2 arbitrage.py, get_balance, market:", market)
         #     # print(market)
 
     # create arbitrer bot with args from execute command, from CLI
     def create_arbitrer(self, args):
         self.arbitrer = arbitrer.Arbitrer()
-        # print("3. arbitrage.py, create_arbitrer && Arbitrer() has been created; args: ", args)
-        if args.observers:
-            # print("3.1 arbitrage.py, create_arbitrer, args.observers = TRUE")
-            self.arbitrer.init_observers(args.observers.split(","))
         if args.markets:
-            print("arbitrage.py, create_arbitrer, markets initialized: ", args.markets)
             self.exchanges = self.arbitrer.init_markets(args)
-            # print("6.0 arbitrage.py, create_arbitrer, args.markets = true; markets have been initiatlized, args.market (after re-assigning): ",
-            #       args.markets, "\n self.exchanges: ", self.exchanges)
-
+        print("args.observers: ", args.observers)
+        if args.observers:
+            print("arbitrage.py, crate_arbitrer, -- passed if statement")
+            try:
+                print("arbitrage.py, crate_arbitrer, args.observers:" + args.observers.split(","))
+                self.arbitrer.init_observers(args.observers.split(","))
+            # Sending init_observers a list of args.observers (from config)
+            except AttributeError as e:
+                print("No listed observers in command line argument - pulling observers from config file")
+                self.arbitrer.init_observers(args.observers)
 
     def init_logger(self, args):
         level = logging.INFO
@@ -126,15 +131,15 @@ class ArbitrerCLI:
                             action="store_true")
         parser.add_argument("-v", "--verbose", help="info verbose mode",
                             action="store_true")
-        parser.add_argument("-o", "--observers", type=str,
-                            help="observers, example: -oLogger,Emailer")
+        parser.add_argument("-o", "--observers", type=str, help="observers, example: -oLogger,Emailer", default=config.observers)
         parser.add_argument("-m", "--markets", type=str,
                             help="list markets to arbitrage; example: -m BitstampEUR,KrakenEUR. Leave empty to pull markets from config.py file",
                             default=config.markets_ccxt)
         parser.add_argument("command", nargs='*', default="watch",
                             help='verb: "watch|replay-history|get-balance|list-public-markets"')
         args = parser.parse_args()
-        print("1. arbitrage.py, main --> args:", args, "\n 1. init_logger(args): ", self.init_logger(args))
+        print("Args: ", args)
+        self.init_logger(args)
         self.init_logger(args)
         self.exec_command(args)
 

@@ -39,13 +39,13 @@ class Market(object):
     #     return self.depth
 
     def convert_to_usd(self):
-        print("arbitrage, public_markets, market.py, convert_to_usd()")
+        # print("arbitrage, public_markets, market.py, convert_to_usd()")
         if self.currency == "USD":
             print("arbitrage, public_markets, convert_to_usd, self.currency = USD")
             return
         for direction in ("asks", "bids"):
             for order in self.depth[direction]:
-                print("arbitrage, public_markets, market.py, convert_to_usd(), for loop nested")
+                # print("arbitrage, public_markets, market.py, convert_to_usd(), for loop nested")
                 order["price"] = self.fc.convert(order["price"], self.currency, "USD")
 
     # def ask_update_depth(self):
@@ -66,9 +66,9 @@ class Market(object):
     #         log_exception(logging.DEBUG)
 
     def get_ticker(self):
-        print("3.0 market.py, get_ticker")
-        # depth = self.get_depth()
-        print("3.0 market.py, get_ticker, depth: ", depth)
+        # print("!!!!!!!!!!!!!!3.0 market.py, get_ticker")
+        depth = self.get_depth()
+        # print("3.0 market.py, get_ticker, depth: ", depth)
         res = {'ask': 0, 'bid': 0}
         if len(depth['asks']) > 0 and len(depth["bids"]) > 0:
             res = {'ask': depth['asks'][0],
@@ -78,7 +78,7 @@ class Market(object):
     ## Abstract methods
     def update_depth(self):
         # import pdb; pdb.set_trace()
-        print("arbitrage, market.py, update_depth, passing (self): ", self)
+        # print("arbitrage, market.py, update_depth, passing (self): ", self)
         pass
 
     def buy(self, price, amount):
