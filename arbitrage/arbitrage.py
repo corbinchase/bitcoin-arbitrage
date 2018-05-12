@@ -29,8 +29,8 @@ class ArbitrerCLI:
             self.create_arbitrer(args)
             # self.list_markets()
             # print("7. Arbitrage.py, exec_command, getting balance, args: ", args)
-            # TODO: get API keys and start using get_balance()
             self.get_balance(args)
+            print("arbitrage.py, after get_balance")
             self.arbitrer.loop()
             # print("replay history:")
             self.arbitrer.replay_history(args.replay_history)
@@ -107,9 +107,9 @@ class ArbitrerCLI:
             self.exchanges = self.arbitrer.init_markets(args)
         print("args.observers: ", args.observers)
         if args.observers:
-            print("arbitrage.py, crate_arbitrer, -- passed if statement")
+            # print("arbitrage.py, crate_arbitrer, -- passed if statement")
             try:
-                print("arbitrage.py, crate_arbitrer, args.observers:" + args.observers.split(","))
+                # print("arbitrage.py, crate_arbitrer, args.observers:" + args.observers.split(","))
                 self.arbitrer.init_observers(args.observers.split(","))
             # Sending init_observers a list of args.observers (from config)
             except AttributeError as e:
@@ -139,7 +139,7 @@ class ArbitrerCLI:
                             help='verb: "watch|replay-history|get-balance|list-public-markets"')
         args = parser.parse_args()
         print("Args: ", args)
-        self.init_logger(args)
+        # self.init_logger(args)
         self.init_logger(args)
         self.exec_command(args)
 

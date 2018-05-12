@@ -10,6 +10,7 @@ import config
 from public_markets import bitstampeur
 from public_markets import market
 import pprint
+from observers.traderbot import TraderBot
 
 
 class Arbitrer(object):
@@ -20,10 +21,10 @@ class Arbitrer(object):
         if depths is None:
             self.depths = {}
         self.pairs = config.pairs
+        self.current_pair = ''
         self.tickers = {}
         self.ask_market = []
         self.bid_market = []
-        self.pair = []
         # self.init_markets(config.markets_ccxt)
         self.limit = 10 # number of bid/ask orders to return
         # self.init_observers(config.observers)       # observers configured immediately
@@ -71,8 +72,6 @@ class Arbitrer(object):
                 exec('import observers.' + observer_name.lower())
                 if observer_name == "TraderBot":
                     # exec('from observers.' + observer_name.lower() + ' import ' + observer_name)
-                    from observers.traderbot import TraderBot
-                    # TODO: make dynamic (current brute force instantiation of TraderBot)
                     observer = TraderBot(self.exchanges)
                     # observer = eval('observers.' + observer_name.lower() + '.' + observer_name + '('+self.exchanges+')')
                 else:
@@ -81,6 +80,7 @@ class Arbitrer(object):
             except (ImportError, AttributeError) as e:
                 print("arbitrer.py, init_observers, failed observer: {}, is invalid: Ignored (you should check your config file), "
                       "error: {}".format(observer_name, e))
+        import sys
 
     def get_exchange_variable(self):
         return self.exchanges
@@ -146,14 +146,13 @@ class Arbitrer(object):
 
         # print("arbitrer.py, get_max_depth: kask: {}, kbid: {}".format(kask, kbid))
 
-        print("arbitrer.py, get_max_depth: self.depths[kbid]['bids'][0]:: {};; self.depths[kbid]['bids'][1]: {}; length_kbid: {}, "
-              "length_kask: {}".format(self.depths[kbid]["bids"][0], self.depths[kbid]["bids"][1], length_kbid, length_kask))
+        # print("arbitrer.py, get_max_depth: self.depths[kbid]['bids'][0]:: {};; self.depths[kbid]['bids'][1]: {}; length_kbid: {}, "
+        #       "length_kask: {}".format(self.depths[kbid]["bids"][0], self.depths[kbid]["bids"][1], length_kbid, length_kask))
         max_spend_ask = 0   # in base currency
         max_spend_bid = 0   # in base currency
         max_vol_ask = 0
         max_vol_bid = 0
-        temp_spend = 0
-        temp_vol = 0
+
         ###
             # while self.depths[kask]["asks"][i]["price"] < self.depths[kbid]["bids"][0]["price"]:
             #     if i >= len(self.depths[kask]["asks"]) - 1:
@@ -168,12 +167,12 @@ class Arbitrer(object):
             # maximum volume of coin purchased with avialable base currency (max btc in config file) - # TODO: max avilable balance in base currency
             while self.depths[kask]["asks"][i][0] < self.depths[kbid]["bids"][0][0]:
                 max_spend_ask += (self.depths[kask]["asks"][i][0] * self.depths[kask]["asks"][i][1])
-                print("max_spend_ask: ", max_spend_ask)
+                # print("get_max_depth, max_spend_ask: ", max_spend_ask)
                 max_vol_ask += self.depths[kask]["asks"][i][1]
                 if max_spend_ask >= self.max_tx_volume:
                     # amount (within self.max_tx_volume
-                    print("reached max tx volume (will full as much of last order as possible ) max_spend_ask: {}, max_vol_ask: {}".format(
-                        max_spend_ask, max_vol_ask))
+                    print("arbitrer.py, get_max_depth: reached max tx volume (will fill as much of last order as possible ) max_spend_ask: {}, "
+                          "max_vol_ask: {}".format(max_spend_ask, max_vol_ask))
                     break
                 if i >= length_kask - 1:
                     break
@@ -184,16 +183,16 @@ class Arbitrer(object):
                 max_spend_bid += (self.depths[kbid]["bids"][j][0] * self.depths[kbid]["bids"][j][1])
                 max_vol_bid += self.depths[kbid]["bids"][j][1]
                 if max_spend_bid >= self.max_tx_volume:           # TODO: do we care if max spend bid is over max transaction limit?
-                    print("reached max tx volume will full as much of last order as possible ) max_spend_bid: {}, max_vol_bid: {}"
-                          .format(max_spend_bid, max_vol_bid))
+                    # print("arbitrer.py, get_max_depth: (reached max tx volume will fill as much of last order as possible ) max_spend_bid: {}, "
+                    #       "max_vol_bid: {}".format(max_spend_bid, max_vol_bid))
                     break
                 if j >= length_kbid - 1:
                     break
                 j += 1
-        print("arbitrer.py, get_max_depth::: max_spend_ask: {}, max_spend_bid: {}, max_vol_ask: {}, max_vol_bid:{} ".format(max_spend_ask,
-                                                                                                                            max_spend_bid,
-                                                                                                                            max_vol_ask,
-                                                                                                                            max_vol_bid))
+        # print("arbitrer.py, get_max_depth::: max_spend_ask: {}, max_spend_bid: {}, max_vol_ask: {}, max_vol_bid:{} ".format(max_spend_ask,
+        #                                                                                                                     max_spend_bid,
+        #                                                                                                                     max_vol_ask,
+        #                                                                                                                     max_vol_bid))
         return i, j, max_spend_ask, max_vol_ask
 
     def arbitrage_depth_opportunity(self, kask, kbid):
@@ -218,6 +217,7 @@ class Arbitrer(object):
                     best_w_buyprice, best_w_sellprice = (w_buyprice, w_sellprice)
         print("arbitrage_depth_opportunity, best_i: {}, best_j: {}; best_profit: {}, best_volume: {}"
               .format(best_i, best_j, best_profit, best_volume))
+                # profit,       volume,                     buyprice,                           sellprice,        weighted_buyprice weighted_sellprice
         return best_profit, best_volume, self.depths[kask]["asks"][best_i][0], self.depths[kbid]["bids"][best_j][0], best_w_buyprice, best_w_sellprice
 
     # setting global bid and ask markets so we can easily send to observers
@@ -226,15 +226,16 @@ class Arbitrer(object):
             # print("KASK: {}; KBID: {}; exchange: {}".format(kask, kbid, exchange))
             if kask == str(exchange.id):
                 self.ask_market = exchange
-                print("arbitrer.py, set_ask_and_bid_markets; kask -- self.ask_market: {}".format(self.ask_market))
+                # print("arbitrer.py, set_ask_and_bid_markets; kask -- self.ask_market: {}".format(self.ask_market))
             if kbid == str(exchange.id):
                 self.bid_market = exchange
-                print("arbitrer.py, set_ask_and_bid_markets; kbid -- self.bid_market: {}".format(self.bid_market))
+                # print("arbitrer.py, set_ask_and_bid_markets; kbid -- self.bid_market: {}".format(self.bid_market))
 
     def arbitrage_opportunity(self, kask, ask, kbid, bid):
         # perc = (bid["price"] - ask["price"]) / bid["price"] * 100   # original
 
         self.set_ask_and_bid_markets(kask, kbid)
+        print("arbitrer.py, arbitrage_opportunity, self.ask_market: {}; self.bid_market: {}".format(self.ask_market, self.bid_market))
 
         perc = (bid[0] - ask[0]) / bid[0] * 100
         profit, volume, buyprice, sellprice, weighted_buyprice, weighted_sellprice = self.arbitrage_depth_opportunity(kask, kbid)
@@ -245,12 +246,12 @@ class Arbitrer(object):
         print("arbitrage_opportunity. profit: {}, volume: {}, buyprice: {}, kask: {}, sellprice: {}, kbid: {}, perc2: {}, "
               "weighted_buyprice: {}, weighted_sellprice: {}".format(profit, volume, buyprice, kask, sellprice, kbid, perc2, weighted_buyprice,
                                                                      weighted_sellprice))
-        pair = self.pair
+
         for observer in self.observers:
-            print("arbiter.py, arbitrage_opportunity, pair: {}".format(pair))
+            # print("arbiter.py, arbitrage_opportunity, pair: {}".format(pair))
             observer.opportunity(
                 profit, volume, buyprice, kask, sellprice, kbid,
-                perc2, weighted_buyprice, weighted_sellprice, pair, self.ask_market, self.bid_market)
+                perc2, weighted_buyprice, weighted_sellprice, self.current_pair, self.ask_market, self.bid_market)
 
     # def __get_market_depth(self, exchange, depths):
     #     # Corbin writing here_____
@@ -258,16 +259,24 @@ class Arbitrer(object):
     #         self.depths[exchange.id] = exchange.fetch_order_book(pair, self.limit)
     #     # print("arbiter.py, __get_market_depth - out of for loop, depths[binance]: ", depths['binance'])
     #     # depths[market.name] = market.get_depth() #OG
+    def set_current_pair(self, pairs):
+        # TODO: augment so capable of sending different pairs, depending on opportunity
+        self.current_pair = [i for i in pairs]
+        self.current_pair = self.current_pair[0]
+        # print("2.1 arbitrage.py, set_current_pair")
 
     def update_depths(self):
         depths = {}
         futures = []
+        # print("2. arbitrage.py, update depths")
+        self.set_current_pair(self.pairs)
         for exchange in self.exchanges:
             # TODO: threadpool -- this is where the error starts - future error: Future at 0x102230908 state=finished raised AttributeError
             # futures.append(self.threadpool.submit(self.__get_market_depth, market, depths))       # TODO: re-introduce threading
             # self.__get_market_depth(exchange, depths)
+
             # TODO: get list of pairs from exchanges ? - or list pair combinations by exchange in config?
-            for pair in self.pairs:
+            # for coin in self.pairs:
 
                 # exmample badass code
                 # [i.split('/', 1) for i in pair]
@@ -276,14 +285,16 @@ class Arbitrer(object):
 
                 # print("arbitrer.updatedepths, pair.split(/): {}".format(pair.split('/')))
 
-                # TODO: make sure we actually need self.pair (may just need bid_coin & ask_coin)
-                self.pair = pair
-                try:
-                    # self.depths[exchange.id][pair] = exchange.fetch_order_book(pair)
-                    self.depths[exchange.id] = exchange.fetch_order_book(pair)
-                except Exception as e:
-                    logging.log(20, "arbitrer.py, update_depths, Can't get exchange: {}, pair: {}, ticker. Error: ".format(exchange.id, pair,
-                                                                                                                           str(e)))
+            # TODO: make sure we actually need self.pair (may just need bid_coin & ask_coin)
+            # print("self.current_pair: {}".format(self.current_pair))
+            # print("2.2 arbitrage.py, update depths, setting depths")
+            try:
+                # self.depths[exchange.id][pair] = exchange.fetch_order_book(pair)
+                self.depths[exchange.id] = exchange.fetch_order_book(self.current_pair)
+            except Exception as e:
+                logging.log(20, "arbitrer.py, update_depths, Can't get exchange: {}, coin: {}, ticker. Error: ".format(exchange.id, self.current_pair,
+                                                                                                                       str(e)))
+            # print("2.3 arbitrage.py, update depths, setting depths, waiting futures, len(self.depths): {}".format(len(self.depths)))
         wait(futures, timeout=20)
         return depths
 
@@ -316,13 +327,12 @@ class Arbitrer(object):
             self.tick()
 
     def tick(self):
-        # print("arbitrer.py, tick")
+        # print("arbitrer.py, tick, scanning markets ")
         for observer in self.observers:
             # print("arbitrer.py, tick, observer: ", observer)
             observer.begin_opportunity_finder(self.depths)
         # self.depths is structured okay here
         for kmarket1 in self.depths:
-            # print("arbitrage.py, tick, kmarket1: ", kmarket1)       # loop 1, kmarket1 = binance;
             for kmarket2 in self.depths:
                 # print("arbitrage.py, tick, nested for loop - kmarket1: ", kmarket1)       # loop 1, kmarket1 = binance;
                 # print("arbitrage.py, tick, kmarket2: ", kmarket2)       # output is "binance", "poloniex", "binance"
@@ -330,36 +340,73 @@ class Arbitrer(object):
                 # print("arbitrage.py, tick, self.depths: ", self.depths)
                 if kmarket1 == kmarket2:  # same market; Continue == jumps to next for loop
                     continue
-                #   something is wrong with market1 & market2 - redundany in bid/ask books
                 market1 = self.depths[kmarket1]     # loop1, market1 (bids[0]): [0.0003283, 51.32], [0.0003275, 61.06]; loop1 market2 (bids[0]): [0.00030564, 50.0]
                 market2 = self.depths[kmarket2]
-                # print("arbitrer.py, tick, !!!!! at end of nested for loop")
-                # print("arbitrer.py, tick, market1 {}; \n \n market 2 {}".format(market1, market2))
-                # TODO: bid/ask is marketX['bid'][0][0]; depth is marketX['bid'][0][1]; ensure this logic is solid - otherwise could switch bid/ask
-                #  markets
-                print("kmarket1: {}, kmarket2: {}".format(kmarket1, kmarket2))
                 if market1["asks"] and market2["bids"] and len(market1["asks"]) > 0 and len(market2["bids"]) > 0:
+                    # print("float(market1['asks''][0][0]): {} and float(market2["bids"][0][0])".format(float(market1["asks"][0][0]), float(market2["bids"][0][0])))
                     if float(market1["asks"][0][0]) < float(market2["bids"][0][0]):
-                        print("&& market1['asks'][0]: {} \n&& market2['bids][0]: {}".format(market1["asks"][0][0], market2["bids"][0][0]))
-                        self.arbitrage_opportunity(kmarket1, market1["asks"][0], kmarket2, market2["bids"][0])
+                        print("OPPORTUNITY FOUND: market1['asks'][0]: {} \n&& market2['bids][0]: {}".format(market1["asks"][0][0],
+                                                                                                             market2["bids"][0][0]))
+                        self.arbitrage_opportunity(kmarket1, market1["asks"][0], kmarket2, market2["bids"][0])  # (kask, ask, kbid, bid)
+                        self.execute_trade()
+                    else:
+                        print("no arb opportunity: market1_ask: {} {} should be < market2_bid: {} {}"
+                              .format(kmarket1, float(market1["asks"][0][0]), kmarket2, float(market2["bids"][0][0])))
+                        # print('arbitrer.py, tick, no arb opportunity, market1_ask: {}; market2_bid: {}'
+                        #       .format(float(market1["asks"][0][0]), float(market2["bids"][0][0])))
+                else:
+                    print("arbitrer.py, tick, not retrieving market asks or bids properly; len(market1['asks']): {}, len(market2['bids']): {}"
+                        .format(len(market1["asks"]), len(market2["bids"])))
+        # self.execute_trade()
 
+    def execute_trade(self):
         # identify opportunites, execute trades, execute transfer of funds
         for observer in self.observers:
-            # close identification of opportunity and execute trade
-            successful_execution = observer.end_opportunity_finder()
-            if successful_execution:
-                observer.withdraw_funds()
-                # TODO: check that exact balance has been sucessfully added (not just that balance >= volume)
-                while not observer.withdrawal_completed():
-                    print("arbitrer.py, tick, withdrawal not complete, waiting 20 seconds")
-                    time.sleep(20)
-                observer.execute_base_sale() # execute sale of transfered funds
-            else:
-                logging.warning("arbitrer.py, tick, not successful execution")
+            if observer.__name__ == 'TraderBot':
+                # close identification of opportunity and execute trade
+                print("execute purchase of base coin on ask_market {} (sending to end_opportunity_finder)".format(self.ask_market))
+                # check if we have completed the purchase of base currency on ask_market
+                successful_execution = observer.end_opportunity_finder(self.ask_market)
+                print("arbitrer.py, execute_trade, finished 'end_opportunity_finder', successful_execution: {}".format(successful_execution))
+                if successful_execution:
+                    # withdraw funds from ask_market (where purhcase made) to bid_market (where we will sell coins)
+                    observer.withdraw_funds()
+                    # TODO: check that exact balance has been sucessfully added (not just that balance >= volume)
+                    i = 0
+                    j = 30      # withdraw wait time increment
+                    withdraw_wait_time = observer.get_wait_time(self.current_pair)
+                    while not observer.withdraw_completed():
+                        print("arbitrer.py, tick, withdrawal incomplete. Waiting {} seconds".format(j))
+                        time.sleep(j)
+                        if i >= withdraw_wait_time / 60:        # withdraw wait time is in seconds
+                            logging.warning("unable to confirm withdrawal. It has been {} minutes".format(withdraw_wait_time / 60))
+                            break
+                        i += i
+                    if observer.withdraw_completed():
+                        print("arbitrer.py, tick, withdrawal complete!!! concluding arbitrage by selling base coin on bid market")
+                        observer.execute_base_sale()    # execute sale of base coin for quote coin
+                        while not observer.complete_arbitrage(self.bid_market):     # executing sale of base coin on bid market
+                            print("base coin sale on bid market incomplete. Waiting 30 seconds")
+                            time.sleep(30)
+                            if i >= 20:
+                                logging.warning("unable to confirm complete sale of base coin on bid market. It has been 10 minutes")
+                                break
+                            i += i
+                        logging.warning("I HAVE SUCCESSFULLY COMPLETED A TRADE!!!!!!!!!!!")
+                    else:
+                        logging.warning("arbitrer.py, tick, observer.withdrawal_complete failed, but left while loop")
+                else:
+                    logging.warning("arbitrer.py, tick, unsuccessful trade and execution, successful_execution = False, check traderbot, "
+                                    "confirm_trade_execution")
+            # else:
+            #     print("arbiter.py, observer is not traderbot, observer is: {}".format(observer.__name__))
 
     def loop(self):
         while True:
             self.update_depths()
+            # print("3. arbitrage.py, after update depths")
             self.get_tickers()
+            # print("4. arbitrage.py, after get_tickers")
             self.tick()
+            # print("4. arbitrage.py, after self.tick")
             time.sleep(config.refresh_rate)

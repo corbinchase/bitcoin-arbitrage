@@ -19,7 +19,7 @@ class HistoryDumper(Observer):
         fp = open(filename, 'w')
         json.dump(depths, fp)
 
-    def end_opportunity_finder(self):
+    def end_opportunity_finder(self, market):
         pass
 
     def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid, perc, weighted_buyprice, weighted_sellprice, pair, ask_market, bid_market):
