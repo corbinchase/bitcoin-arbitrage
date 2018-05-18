@@ -32,6 +32,12 @@ class TraderBot(Observer):
         self.buyprice = 0
         self.trade_fee = 0
         self.withdraw_fee = 0
+        self.pre_trade_base_balance = 0
+        self.pre_trade_quote_balance = 0
+        self.pre_withdraw_bid_balance = 0
+        self.base_coin_to_sell = 0
+        self.min_tx_volume = 0
+        self.max_tx_volume = 0
 
     def begin_opportunity_finder(self, depths):
         self.potential_trades = []
@@ -41,7 +47,7 @@ class TraderBot(Observer):
             return
         print("traderbot.py, end_opportunity_finder: self.potenital_trades: {}".format(self.potential_trades))
         self.potential_trades.sort(key=lambda x: x[0])
-        print("traderbot.py, end_opportunity_finder: (after lambda sort) self.potenital_trades: {}".format(self.potential_trades))
+        # print("traderbot.py, end_opportunity_finder: (after lambda sort) self.potenital_trades: {}".format(self.potential_trades))
 
         # Execute only the best (more profitable)
         self.execute_trade(*self.potential_trades[0][1:])
@@ -49,10 +55,13 @@ class TraderBot(Observer):
         print("TRADE EXECUTED, WAIT self.trade_wait (10) SECONDS AND THEN START CONFIRMATION SEQUENCE")
         time.sleep(self.trade_wait/2)
         if self.confirm_trade_execution(ask_market):
-            pre_trade_base_volume = next(iter(self.base_coin.values()))
-            pre_trade_quote_volume = next(iter(self.quote_coin.values()))
+            # set pre_trade balances with cached balance and update current balance
+            self.pre_trade_base_balance = next(iter(self.base_coin.values()))
+            self.pre_trade_quote_balance = next(iter(self.quote_coin.values()))
             self.update_balance(self.current_pair)
-            if pre_trade_base_volume < next(iter(self.base_coin.values())) and pre_trade_quote_volume > next(iter(self.quote_coin.values())):
+            # check that new base balance is larger than old base balance & new quote balance is lower than old quote balance
+            if self.pre_trade_base_balance < next(iter(self.base_coin.values())) and self.pre_trade_quote_balance > next(iter(
+                    self.quote_coin.values())):
                 print("traderbot.py, end_opportunity_finder: sucessful execution :)")
                 return True
             else:
@@ -64,61 +73,59 @@ class TraderBot(Observer):
         return self.confirm_trade_execution(market)
 
     # transfer funds from ask market to bid market
-    ### STOPPED HERE###
     def withdraw_funds(self):
-        if self.deposit_address and next(iter(self.base_coin.keys())) and self.volume:
+        if self.deposit_address and next(iter(self.base_coin.keys())):
             # TODO: pull only the latest trade volume, not complete balance
             # try:
-            self.update_balance(self.current_pair)
+            # self.update_balance(self.current_pair)
+            balance_to_withdraw = next(iter(self.base_coin.values())) - self.pre_trade_base_balance
+            self.pre_withdraw_bid_balance = self.bid_market.fetchBalance()['free'][next(iter(self.base_coin.keys()))]
             if next(iter(self.base_coin.values())):
                 if 'tag' in self.deposit_address:
-                    self.ask_market.withdraw(next(iter(self.base_coin.keys())), next(iter(self.base_coin.values())),
+                    self.ask_market.withdraw(next(iter(self.base_coin.keys())), balance_to_withdraw,
                                              self.deposit_address['address'], tag=self.deposit_address['tag'])
+                    print("traderbot, withdraw_funds, executed withdraw request (with 'tag'); withdraw {} coins from {}"
+                          .format(balance_to_withdraw, self.ask_market.id))
                 else:
-                    self.ask_market.withdraw(next(iter(self.base_coin.keys())), next(iter(self.base_coin.values())),
+                    self.ask_market.withdraw(next(iter(self.base_coin.keys())), balance_to_withdraw,
                                              self.deposit_address['address'])
+                    print("traderbot, withdraw_funds, executed withdraw request (without 'tag') {} to withdraw {} coins"
+                          .format(self.ask_market.id, balance_to_withdraw))
+                    logging.warning("base coin value is unable to be found or is 0; expecting balance_to_withdraw: {}".format(balance_to_withdraw))
             else:
-                logging.warning("base coin value is unable to be found or is 0; expecting roughly: {}".format(self.volume))
-            # except:
-            #     e = sys.exc_info()[0]
-            #     logging.warning("traderbot.py, withdraw_funds: Error: %s" % e)
-
-            # self.ask_market.withdraw(next(iter(self.base_coin.keys())), self.volume, self.deposit_address)
-            #  .withdraw(code, amount, address, tag=None, params={})
+                logging.warning("base coin value is unable to be found or is 0; expecting balance_to_withdraw: {}".format(balance_to_withdraw))
 
     def withdraw_completed(self):
-        bid_market_base_coin = self.bid_market.fetchBalance()['free'][next(iter(self.base_coin.keys()))]
-        if self.withdraw_fee > 0:
-            # TODO: does not take trade fee into account (need to sum: trading fees + withdrawal fee + previous balance) [and make sure only
-            # pulling fees for this partiuclar trade, not other open / closed trades
-            # if bid_market_base_coin >= self.volume - int(self.withdraw_fee):
-            if bid_market_base_coin > 0:
-                logging.warning("traderbot, withdrawal has been completed!!!")
-                return True
-            else:
-                return False
+        # self.pre_withdraw_bid_balance
+        # if self.withdraw_fee > 0:
+        # TODO: does not take trade fee into account (need to sum: trading fees + withdrawal fee + previous balance) [and make sure only
+        # pulling fees for this partiuclar trade, not other open / closed trades
+        # if bid_market_base_coin >= self.volume - int(self.withdraw_fee):
+        # import pdb; pdb.set_trace()
+        # TODO: take into account previous wallet balance, add expected transfer balance (minus transfer fee), and check if that = current
+        # balance before continuing
+        temp_bid_market_base_coin = self.bid_market.fetchBalance()['free'][next(iter(self.base_coin.keys()))]
+        if temp_bid_market_base_coin > self.pre_withdraw_bid_balance:
+            self.base_coin_to_sell = temp_bid_market_base_coin - self.pre_withdraw_bid_balance
+            print("traderbot.py, withdraw_completed, --- withdraw complete; self.base_coin_to_sell: {}".format(self.base_coin_to_sell))
+            return True
         else:
-            if bid_market_base_coin > 0:
-                logging.warning("traderbot, bid_market_base_coin is larger than 0; (unable to take withdrawal fee from {} into account)".format(
-                    self.ask_market.id))
-                return True
-            else:
-                logging.warning("traderbot, withdrawal_completed; DOES NOT APPEAR THAT WITHDRAW WAS COMPLETED ")
-                return False
-
-    # to sell base funds and recieve quota to complete arbitrage transaction
+            print("traderbot.py, withdraw_completed, on market: {} bid_market_base_coin ({:.9f}) is not larger than pre_withdraw_bid_balance ({:.9f})"
+                  .format(self.bid_market.id, temp_bid_market_base_coin, self.pre_withdraw_bid_balance))
+            return False
 
     def execute_base_sale(self):
-        try:
-            # TODO: check if current market price is higheer than expected arb opportunity; if it is, sell at market (or just below market value)
-            sell_volume = self.bid_market.fetchBalance()['free'][next(iter(self.base_coin.keys()))]
-            print("traderbot.py, execute_base_sale, self.base_coin: {}; volume: {}; sellprice: {}".format(next(iter(self.base_coin.keys())),
-                                                                                                          sell_volume, self.sellprice))
-            # TODO: sell only what has been traded, not entire balance
-            self.bid_market.createLimitSellOrder(next(iter(self.base_coin.keys())), sell_volume, self.sellprice)
-        except:
-            e = sys.exc_info()[0]
-            print("traderbot.py, execute_base_sale: Error: %s" % e)
+        # try:
+        # TODO: check if current market price is higheer than expected arb opportunity; if it is, sell at market (or just below market value)
+        # sell_volume = self.bid_market.fetchBalance()['free'][next(iter(self.base_coin.keys()))]
+        print("traderbot.py, execute_base_sale, self.current_pair: {}; volume: {}; sellprice: {}".format(self.current_pair,
+                                                                                                      self.base_coin_to_sell, self.sellprice))
+        # TODO: sell only what has been traded, not entire balance
+        sell_result = self.bid_market.createLimitSellOrder(self.current_pair, self.base_coin_to_sell, self.sellprice)
+        print("traderbot.py, execute_base_sale - sell_result: {}".format(sell_result))
+        # except:
+        #     e = sys.exc_info()[0]
+        #     print("traderbot.py, execute_base_sale: Error: %s" % e)
 
     def confirm_trade_execution(self, market):
         open_orders = market.fetchOpenOrders(symbol=self.current_pair)     # since=undefined, limit=undefined, params={}
@@ -189,13 +196,15 @@ class TraderBot(Observer):
 
     def get_min_tradeable_volume(self, buyprice, base_coin, quote_coin):
         # min1 = next(iter(arb_coin.values()[0])) / ((1 + config.balance_margin) * buyprice)  # set by maxme - (output: min1 = 0)
-        min1 = next(iter(quote_coin.values())) / ((1 + config.balance_margin) * buyprice)   # calcualte max vol purchase with available quote_coin
+        # calcualte max vol purchase with available quote_coin
+        min1 = next(iter(quote_coin.values())) / ((1 + (config.balance_margin/100)) * buyprice)
         # min2 = next(iter(quote_coin.values())) / (1 + config.balance_margin)
         # print("min1: {:.9f}; next(iter(quote_coin.values())): {:.9f}; buyprice: {}".format(min1, next(iter(quote_coin.values())), buyprice))
         # .5 ETH/BAT
         # 10 BAT at 2 BAT/ETH
         # 5 ETH
-        min2 = config.max_tx_volume / buyprice  # max quote coin to spend
+        min2 = self.max_tx_volume / buyprice  # max quote coin to spend
+        print("next(iter(quote_coin.values())) / ((1 + config.balance_margin) * buyprice): {};; self.max_tx_volume / buyprice: {}".format(min1, min2))
         # TODO: set different thresholds for different currencies (vs. USD?)
         # logging.warning("traderbot.py, get_min_tradeable_volume: quote_coin is not BTC - have not configured maximum volume purchases from "
         #                 "non-BTC base. Check: config file. Still proceeding")
@@ -206,8 +215,10 @@ class TraderBot(Observer):
     def get_wait_time(self, pair):
         if pair.split('/')[1] == 'BTC' or pair.split('/')[1] == 'btc':
             # TODO: check avg network congestion through API
-            return 2400     # return took 10 minutes for STRAT / BTC to complete; setting to 40 minutes
+            print("quote coin is BTC, so max wait time is 60 minutes")
+            return 3600     # return took 10 minutes for STRAT / BTC to complete; setting to 40 minutes
         else:
+            print("quote coin is not BTC, so max wait time is 10 minutes")
             return 600      # return 10 minutes for non-BTC quote trades
 
     # set self.ask_market_balance & self.bid_market_balance to
@@ -233,6 +244,18 @@ class TraderBot(Observer):
         if next(iter(self.quote_coin.values())) == 0:
             logging.warning("Available quote coin: {:.9f}; self.quote_coin dict: {}".format(next(iter(self.quote_coin.values())), self.quote_coin))
 
+    def set_min_and_max_tx_volume(self):
+        for coin in config.min_tx_volumes:
+            if self.current_pair.split('/')[1] == coin:
+                self.min_tx_volume = config.min_tx_volumes[coin]
+
+                # print("SELF.MIN_TX_VOLUME: {} for quote coin: {}".format(self.min_tx_volume, coin))
+
+        for coin in config.max_tx_volumes:
+            if self.current_pair.split('/')[1] == coin:
+                self.max_tx_volume = config.max_tx_volumes[coin]
+                print("SELF.MAX_TX_VOLUME: {} for quote coin: {}".format(self.max_tx_volume, coin))
+
     def opportunity(self, profit, volume, buyprice, kask, sellprice, kbid, perc, weighted_buyprice, weighted_sellprice, pair, ask_market, bid_market):
         # this is where self.current_pair is set for the first time
         self.current_pair = pair
@@ -240,6 +263,7 @@ class TraderBot(Observer):
         self.bid_market = bid_market
         self.sellprice = sellprice
         self.buyprice = buyprice
+        self.set_min_and_max_tx_volume()
 
         # print("traderbot, ask_market: {}".format(ask_market))
         # print("traderbot, bid_market: {}".format(bid_market))
@@ -271,13 +295,17 @@ class TraderBot(Observer):
               .format(next(iter(self.base_coin.keys())), self.buyprice, self.sellprice))
 
         max_volume = self.get_min_tradeable_volume(buyprice, self.base_coin, self.quote_coin)
-        print("traderbot, opportunity: volume {}; max_volume {}; {} config.max_tx_volume is {}"
-              .format(volume, max_volume, next(iter(self.quote_coin.keys())), config.max_tx_volume))
+        print("traderbot, opportunity: volume {}; max_volume {}; {} self.max_tx_volume in base coin is {}"
+              .format(volume, max_volume, next(iter(self.quote_coin.keys())), self.max_tx_volume / self.buyprice))
+
+        print("MAX_VOLUME: {}; VOLUME: {}".format(max_volume, volume))
         volume = min(volume, max_volume)
 
-        if volume < config.min_tx_volume:
+        print("self.min_tx_volume: {}".format(self.min_tx_volume))
+        base_coin_min_volume = self.min_tx_volume / self.buyprice
+        if volume < base_coin_min_volume:
             logging.warn("traderbot, opportunity - Can't automate this trade, minimum volume transaction"+
-                         " not reached volume: %f < config.min_tx_volume: %f" % (volume, config.min_tx_volume))
+                         " not reached volume: %f < base_coin_min_volume: %f" % (volume, base_coin_min_volume))
             # value = next(iter(self.base_coin.values()))  # doesn't destroy underlying dict
             logging.warn("Balance on %s: %f USD - Balance on %s: %f BTC"
                          % (kask, next(iter(self.base_coin.values())), kbid, next(iter(self.quote_coin.values()))))
@@ -310,54 +338,120 @@ class TraderBot(Observer):
         # deposit_address = self.get_wallet_address()
         # TODO: take network congestion into account
         # TODO: [WARNING] traderbot.py, withdraw_funds: Error: <class 'KeyError'> - response when coin not available for withdrawal on exchange
-        if self.get_wallet_address():
-            print("if self.get_wallet_address was passed, self.deposit_address: {}".format(self.deposit_address))
-            self.create_buy_order(buyprice, volume)
-            # self.exchanges[kask].buy(volume, buyprice)
-            # self.exchanges[kbid].sell(volume, sellprice)
+
+        if self.bid_market.has['fetchDepositAddress']:
+            self.get_wallet_address()
+            if self.deposit_address:
+                print("if self.get_wallet_address was passed, self.deposit_address: {}".format(self.deposit_address))
+                self.create_buy_order(buyprice, volume)
+                # self.exchanges[kask].buy(volume, buyprice)
+                # self.exchanges[kbid].sell(volume, sellprice)
+            else:
+                print("traderbot.py, execute trade, no deposit address")
+                import pdb; pdb.set_trace()
         else:
-            print("traderbot.py, execute trade, no deposit address")
+            print("traderbot.py, execute trade, no fetchDepositAddress")
 
     # get address from bid market & confirm we are capable of transfering funds
     def get_wallet_address(self):
         # reset self.deposit_address to ensure no carryover from last trades
+        bmarket_deposit_address = {}
         self.deposit_address = {}
-        # print("market.has: {}".format(self.bid_market.has))
-        if self.bid_market.has['fetchDepositAddress']:
+        # trying to retrieve deposit address from bid market
+        try:
+            bmarket_deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+        # retrieving deposit address has vailed, try to create a deposit address, and then retrieve it again, before failing out
+        except:
             try:
-                self.deposit_address['address'] = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
-                print("traderbot.py, get_wallet_address, self.deposit_address: {}".format(self.deposit_address))
-                return True
+                print("traderbot.py, get_wallet_address, no available address, trying to create one")
+                if self.bid_market.has['createDepositAddress']:
+                    self.bid_market.createDepositAddress(next(iter(self.base_coin.keys())))
+                    print("traderbot.py, get_wallet_address, no available address, trying to create one - waiting 60 seconds to fetch created "
+                          "address")
+                    time.sleep(60)
+                    bmarket_deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+                # trying one more time
+                else:
+                    print("traderbot.py, get_wallet_address, waiting 30 seconds before trying again")
+                    time.sleep(20)
+                    bmarket_deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+                    print("traderbot.py, get_wallet_address, bmarket_deposit_address: {}".format(bmarket_deposit_address))
             except:
-                try:
-                    print("traderbot.py, get_wallet_address, no available address, trying to create one")
-                    if self.bid_market.has['createDepositAddress']:
-                        self.bid_market.createDepositAddress(next(iter(self.base_coin.keys())))
-                        print("traderbot.py, get_wallet_address, no available address, trying to create one - waiting 60 seconds to fetch created "
-                              "address")
-                        time.sleep(60)
-                        self.deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
-                    # trying one more time
-                    else:
-                        print("traderbot.py, get_wallet_address, waiting 30 seconds before trying final time")
-                        time.sleep(30)
-                        self.deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
-                        print("traderbot.py, get_wallet_address, no available address self.deposit_address: {}".format(self.deposit_address))
-                    if self.deposit_address:
-                        print("self.deposit_address: {}".format(self.deposit_address))
-                        return True
-                    else:
-                        return False
-                except:
-                    print("traderbot.py, get_wallet_address, no available address & unable to create one")
-                    import sys
-                    e = sys.exc_info()[0]
-                    print("traderbot.py, get_wallet_address: Error: %s" % e)
-                    return False
+                print("traderbot.py, get_wallet_address, no available address & unable to create one")
+                import sys
+                e = sys.exc_info()[0]
+                print("traderbot.py, get_wallet_address: Error: %s" % e)
+        # parsing deposit address data from API into readable form
+        if bmarket_deposit_address:
+            extraction_targets = [
+                {'field_to_extract': 'address', 'field_is_required': True}, {'field_to_extract': 'tag', 'field_is_required': False}
+            ]
+           # Iterate through our fields to extract, and save them to the deposit_address dict. Error out if we fail to extract a required field.
+            for target in extraction_targets:
+                key_to_extract = target['field_to_extract']
+                key_is_required = target['field_is_required']
+                # If we find the key at top level, and it's non-empty string, we're good!
+                if type(bmarket_deposit_address.get(key_to_extract)) == str and len(bmarket_deposit_address[key_to_extract]):
+                    self.deposit_address[key_to_extract] = bmarket_deposit_address[key_to_extract]
+                # If the field isn't at the top level, we assume it will be within a dictionary associated with the key "address".
+                elif type(bmarket_deposit_address.get('address')) == dict and type(
+                        bmarket_deposit_address['address'].get(key_to_extract)) == str and \
+                        len(bmarket_deposit_address['address'][key_to_extract]):
+                    self.deposit_address[key_to_extract] = bmarket_deposit_address['address'][key_to_extract]
+                # Okay, we've failed to extract the key where we expect it to be. Error out or print warning depending on whether we need this field.
+                elif key_is_required:
+                    raise AttributeError('Trade cannot be executed without required parameter "deposit address"')
+                else:
+                    print('Warning: could not load field {} from bmarket. Continuing anyways.'.format(key_to_extract))
+            print("traderbot.py, get_wallet_address: self.deposit_address: {}".format(self.deposit_address))
+            # if self.deposit_address:
+            #     return True
+            # else:
+            #     return False
         else:
-            print("market: {} doesn't have an address for coin: {}".format(self.bid_market.id, next(iter(self.base_coin.keys()))))
+            logging.warning("traderbot, get_wallet_address, could not retrieve address in readable form. Address: {}".format(self.deposit_address))
             return False
 
+    # reset self.deposit_address to ensure no carryover from last trades
+        # self.deposit_address = {}
+        # # print("market.has: {}".format(self.bid_market.has))
+        # if self.bid_market.has['fetchDepositAddress']:
+        #     try:
+        #         self.deposit_address['address'] = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+        #         print("traderbot.py, get_wallet_address, self.deposit_address: {}".format(self.deposit_address))
+        #         return True
+        #     except:
+        #         try:
+        #             print("traderbot.py, get_wallet_address, no available address, trying to create one")
+        #             if self.bid_market.has['createDepositAddress']:
+        #                 self.bid_market.createDepositAddress(next(iter(self.base_coin.keys())))
+        #                 print("traderbot.py, get_wallet_address, no available address, trying to create one - waiting 60 seconds to fetch created "
+        #                       "address")
+        #                 time.sleep(60)
+        #                 self.deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+        #             # trying one more time
+        #             else:
+        #                 print("traderbot.py, get_wallet_address, waiting 30 seconds before trying final time")
+        #                 time.sleep(30)
+        #                 self.deposit_address = self.bid_market.fetchDepositAddress(next(iter(self.base_coin.keys())))
+        #                 print("traderbot.py, get_wallet_address, no available address self.deposit_address: {}".format(self.deposit_address))
+        #             if self.deposit_address:
+        #                 print("self.deposit_address: {}".format(self.deposit_address))
+        #                 return True
+        #             else:
+        #                 return False
+        #         except:
+        #             print("traderbot.py, get_wallet_address, no available address & unable to create one")
+        #             import sys
+        #             e = sys.exc_info()[0]
+        #             print("traderbot.py, get_wallet_address: Error: %s" % e)
+        #             return False
+        # else:
+        #     print("market: {} doesn't have an address for coin: {}".format(self.bid_market.id, next(iter(self.base_coin.keys()))))
+        #     return False
+
+
+    # TODO: accept market order type (and limit?) ?
 
     # TODO: accept market order type (and limit?) ?
     def create_buy_order(self, buyprice, volume):
@@ -365,9 +459,9 @@ class TraderBot(Observer):
         print("4.0 traderbot.py, create_buy_order")
         # TODO: add try/except phrase back in - was removed so that ccxt errors could print
         # try:
-            # self.ask_market.createOrder(pair, 'limit', 'buy', buyprice, volume)
-            # createOrder (symbol, type, side, amount[, price[, params]])
-            # createLimitBuyOrder (symbol, amount, price[, params])
+        # self.ask_market.createOrder(pair, 'limit', 'buy', buyprice, volume)
+        # createOrder (symbol, type, side, amount[, price[, params]])
+        # createLimitBuyOrder (symbol, amount, price[, params])
         print("traderbot.py, create_buy_order on {}; buy {} amount of {} at price: {}".format(self.ask_market.id, volume, self.base_coin, buyprice))
         order_result = self.ask_market.createLimitBuyOrder(self.current_pair, volume, buyprice)
 
